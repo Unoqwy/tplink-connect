@@ -8,16 +8,6 @@ const RSA_BIT: usize = 512;
 const STR_DE_LEN: usize = RSA_BIT / 8;
 
 pub fn rsa_encrypt(s: String, n: String, e: String) -> String {
-    // for (var ba = new Array, i = 0, j = 0; i < s.length && j < n; ) {
-    //   var c = s.charCodeAt(i++);
-    //   c < 128 ?
-    //     ba[j++] = c
-    //   : c > 127 && c < 2048 ?
-    //       (ba[j++] = 63 & c | 128, ba[j++] = c >> 6 | 192)
-    //     :
-    //       (ba[j++] = 63 & c | 128, ba[j++] = c >> 6 & 63 | 128, ba[j++] = c >> 12 | 224)
-    // }
-
     let (n, e) = (BigNum::from_hex_str(&n).unwrap(),
         BigNum::from_hex_str(&e).unwrap());
 
@@ -48,6 +38,16 @@ pub fn rsa_encrypt(s: String, n: String, e: String) -> String {
 }
 
 fn rsa_no_padding(s: String, n: usize) -> BigNum {
+    // for (var ba = new Array, i = 0, j = 0; i < s.length && j < n; ) {
+    //   var c = s.charCodeAt(i++);
+    //   c < 128 ?
+    //     ba[j++] = c
+    //   : c > 127 && c < 2048 ?
+    //       (ba[j++] = 63 & c | 128, ba[j++] = c >> 6 | 192)
+    //     :
+    //       (ba[j++] = 63 & c | 128, ba[j++] = c >> 6 & 63 | 128, ba[j++] = c >> 12 | 224)
+    // }
+
     if n < s.len() {
         panic!("Message too long for RSA");
     }
