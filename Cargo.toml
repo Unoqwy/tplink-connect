@@ -1,13 +1,16 @@
 [package]
 name = "tplink-connect"
 version = "0.1.0"
-authors = ["Unoqwy <julien.qwy@gmail.com>"]
 edition = "2018"
+authors = ["Unoqwy <julien.qwy@gmail.com>"]
+
+license = "MIT"
+description = "Communicate with a TP-Link router over an encrypted connection"
 
 [dependencies]
-regex = "1.4.2"
 reqwest = { version = "0.10.9", features = ["blocking", "cookies"] }
 form_urlencoded = "1.0.0"
+regex = "1.4.2"
 
 rand = "0.7.3"
 hex = "0.4.2"

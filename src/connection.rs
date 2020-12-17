@@ -12,6 +12,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use rand::RngCore;
 use rand::rngs::OsRng;
 
+use std::convert::TryFrom;
+
 #[derive(Debug)]
 pub enum Error {
     CannotCreateConnection,
@@ -53,6 +55,18 @@ pub enum ActType {
     //GS = 6,
     //OP = 7,
     //CGI = 8,
+}
+
+impl TryFrom<u8> for ActType {
+    type Error = ();
+
+    fn try_from(v: u8) -> Result<Self, Self::Error> {
+        match v {
+            1 => Ok(ActType::GET),
+            5 => Ok(ActType::GL),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -229,7 +243,7 @@ impl EncryptedConnection {
         None
     }
 
-    pub fn act(&self, requests: Vec<ActRequest>) -> Result<String> {
+    pub fn act(&self, requests: Vec<ActRequest>) -> Result<Vec<ActSection>> {
         if self.encryption.is_none() {
             return Err(Error::MissingEncryptionData);
         }
@@ -264,6 +278,14 @@ impl EncryptedConnection {
             req_body.push_str(&format!("{}\r\n", line));
         }
 
+        if req_body.len() < 64 {
+            // if the body length is less than 64, the router won't answer
+            // so we add spaces after the header line to have at least 64 chars
+            req_body = req_body.splitn(2, "\r\n")
+                .collect::<Vec<&str>>()
+                .join(&(" ".repeat(64 - req_body.len()) + "\r\n"));
+        }
+
         let encrypted_body = self.encrypt(req_body, false)?;
         let body = format!("sign={}\r\ndata={}\r\n", encrypted_body.1, encrypted_body.0);
         let res = self.client.post(&format!("{}/cgi_gdpr", self.address))
@@ -272,7 +294,64 @@ impl EncryptedConnection {
             .send().unwrap();
 
         let response = encrypt::aes_decrypt(res.text().unwrap(), &encryption.aes_key, &encryption.aes_iv);
-        Ok(response)
+
+        // FIXME: move this in a lazy_static
+        let re = Regex::new(r"\[(?:\d,?){6}\](\d+)").unwrap();
+
+        // FIXME: handle errors
+        let mut sections_out = vec![ActSection::None; requests.len()];
+        let mut section: Option<ActSection> = None;
+        let mut section_index = 0;
+        for line in response.lines() {
+            if let Some(caps) = re.captures(line) {
+                if let Some(section) = section {
+                    sections_out.insert(section_index, section);
+                }
+
+                section_index = caps.get(1).unwrap().as_str().parse().unwrap();
+                if sections_out.len() > index {
+                    section = Some(sections_out.remove(section_index));
+                } else {
+                    section = match requests[section_index].act_type {
+                        // FIXME: support list
+                        ActType::GET | ActType::GL => Some(ActSection::KeyValue(HashMap::new())),
+                        _ => None
+                    }
+                }
+            } else if let Some(section) = &mut section {
+                match section {
+                    ActSection::KeyValue(map) => {
+                        let section_elts = line.splitn(2, "=")
+                            .map(|s| s.to_owned())
+                            .collect::<Vec<String>>();
+                        if section_elts.len() == 2 {
+                            map.insert(section_elts[0].clone(), section_elts[1].clone());
+                        }
+                    },
+                    _ => {}
+                }
+            }
+        }
+        if let Some(section) = section {
+            sections_out.insert(section_index, section);
+        }
+
+        Ok(sections_out)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ActSection {
+    None,
+    KeyValue(HashMap<String, String>),
+}
+
+impl ActSection {
+    pub fn to_map(&self) -> HashMap<String, String> {
+        match self {
+            ActSection::KeyValue(map) => map.clone(),
+            _ => HashMap::new()
+        }
     }
 }
 
