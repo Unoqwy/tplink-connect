@@ -4,7 +4,7 @@
 
 Communicate with a TP-Link router over an encrypted connection using Rust.
 
-This is a Rust library meant to communicate with the router programmatically.
+This is a Rust library meant to communicate with the router programmatically.  
 ~~If you are looking for a CLI app, you may want to check [this repository](https://github.com/Unoqwy/tplink-connect-cli) out.~~ (was never published)
 
 > :warning: **This project isn't production-ready (at all)**, but should work just fine for testing purposes or data querying.
